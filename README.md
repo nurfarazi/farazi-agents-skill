@@ -11,18 +11,28 @@ Together they form a plan → execute pipeline: `agent-orchestrator-planner` pro
 
 ## Installation
 
-These are [Claude Code](https://claude.com/claude-code) skills. To install:
+These are [Claude Code](https://claude.com/claude-code) skills. Install into your personal skills directory (`~/.claude/skills/`) for all projects, or into `<project-root>/.claude/skills/` for a single project.
 
-1. Copy the skill folder(s) you want into your Claude Code skills directory:
-   - Personal (all projects): `~/.claude/skills/`
-   - Project-specific: `<project-root>/.claude/skills/`
+### Option A — npx (no clone required)
 
-   ```bash
-   cp -r skills/agent-orchestrator-planner ~/.claude/skills/
-   cp -r skills/agent-orchestrator-executor ~/.claude/skills/
-   ```
+Uses [`degit`](https://github.com/Rich-Harris/degit) via `npx` to fetch just the skill folder straight from GitHub:
 
-2. Restart Claude Code (or start a new session). The skills will be picked up automatically and Claude will invoke them when a request matches their description (e.g. "plan this feature", "execute the plan").
+```bash
+npx degit nurfarazi/farazi-agents-skill/skills/agent-orchestrator-planner ~/.claude/skills/agent-orchestrator-planner
+npx degit nurfarazi/farazi-agents-skill/skills/agent-orchestrator-executor ~/.claude/skills/agent-orchestrator-executor
+```
+
+Replace `~/.claude/skills/...` with `.claude/skills/...` to install into the current project instead. Requires Node.js/npm; nothing is installed globally.
+
+### Option B — clone
+
+```bash
+git clone https://github.com/nurfarazi/farazi-agents-skill.git
+cp -r farazi-agents-skill/skills/agent-orchestrator-planner ~/.claude/skills/
+cp -r farazi-agents-skill/skills/agent-orchestrator-executor ~/.claude/skills/
+```
+
+After either option, restart Claude Code (or start a new session). The skills are picked up automatically and Claude invokes them when a request matches their description (e.g. "plan this feature", "execute the plan").
 
 ## Usage
 
