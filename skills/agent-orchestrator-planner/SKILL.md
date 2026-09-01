@@ -36,14 +36,17 @@ Stop grilling only when the answers stop changing the plan. For trivial tasks, o
 
 List the available skills relevant to this task (e.g. `systematic-debugging` for bugs, `test-driven-development`, `using-git-worktrees`, `code-review`, `verify`, `writing-plans`, `executing-plans`). Record in the plan which skill the executor must invoke at which step. Never plan a manual procedure that an available skill already covers.
 
-### Step 3 — Parallel exploration (multiple explorer agents)
+### Step 3 — Exploration, scaled to task size
 
-Launch **parallel read-only `Explore` agents in a single message** so they run concurrently. Standard fan-out (adjust to task size):
+Scale the exploration effort to the task instead of always launching the full agent squad:
 
-1. **Architecture explorer** — repository structure, layering, module boundaries, relevant subsystems, existing patterns and conventions.
-2. **Reuse explorer** — existing components, utilities, services, helpers, and prior implementations of similar behavior that the task should reuse instead of duplicating.
-3. **Impact & risk explorer** — everything the change touches: callers, configs, DI registrations, DB entities/migrations, integration points, tests that will be affected.
-4. *(bugs only)* **Repro/trace explorer** — trace the failing flow end-to-end and identify candidate root causes.
+- **Trivial/single-file task** (typo, config tweak, obviously-scoped one-line fix): skip agent fan-out — do a quick direct `Grep`/`Read` yourself.
+- **Small task** (a few known files, no cross-cutting impact): launch **one** `Explore` agent covering architecture + reuse + impact in a single brief, rather than splitting into separate agents.
+- **Complex/multi-system task**: launch **parallel read-only `Explore` agents in a single message** so they run concurrently, one per concern:
+  1. **Architecture explorer** — repository structure, layering, module boundaries, relevant subsystems, existing patterns and conventions.
+  2. **Reuse explorer** — existing components, utilities, services, helpers, and prior implementations of similar behavior that the task should reuse instead of duplicating.
+  3. **Impact & risk explorer** — everything the change touches: callers, configs, DI registrations, DB entities/migrations, integration points, tests that will be affected.
+  4. *(bugs only)* **Repro/trace explorer** — trace the failing flow end-to-end and identify candidate root causes.
 
 Give each agent a precise question and require file:line references in its answer. Synthesize the findings yourself; if the explorers contradict each other or leave a load-bearing unknown, launch a targeted follow-up agent before planning.
 
@@ -61,8 +64,7 @@ Mandatory content of every plan:
   - Scope: exact files/components to change, incremental and safe.
   - Steps: ordered, specific actions; name any skill to invoke.
   - **Acceptance criteria**: checklist of verifiable outcomes.
-  - **Code review**: after completing the phase, run a code review agent (`/code-review` or a review subagent) on the phase's diff before starting the next phase.
-- **Cross-Validation Phase (final phase, always)** — after all phases: run the full test suite/build, exercise the changed flows end-to-end (`verify` skill), reconcile the result against every acceptance criterion and the original requirements, and run a final overall code review.
+- **Cross-Validation Phase (final phase, always)** — after all phases: run the full test suite/build, exercise the changed flows end-to-end (`verify` skill), reconcile the result against every acceptance criterion and the original requirements, and run a single final overall code review (not repeated per phase).
 - **Out of scope** — explicit list.
 - **Rollback note** — how to abandon safely (worktree makes this cheap).
 
@@ -77,8 +79,8 @@ Mandatory content of every plan:
 1. No code changes, ever. Plan file only.
 2. Interview before exploring; explore before planning.
 3. Parallel explorer agents in one message, not sequential unless one depends on another's output.
-4. Every phase has acceptance criteria and ends with a code review agent step.
-5. Every plan ends with a Cross-Validation Phase.
+4. Every phase has acceptance criteria; code review is not repeated per phase.
+5. Every plan ends with a Cross-Validation Phase, which is the single point where code review happens.
 6. Every plan starts with dedicated worktree creation; never the main branch or main working directory.
 7. Reuse skills and existing code before inventing anything new.
 8. Scale the ceremony to the task — simple task, simple plan.
