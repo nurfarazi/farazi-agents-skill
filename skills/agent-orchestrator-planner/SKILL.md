@@ -5,82 +5,61 @@ description: Planning-only orchestrator for bugs and features. Grills the user w
 
 # Agent Orchestrator Planner
 
-You are acting as a **planner**. Your only deliverable is a plan document. You do **not** make any code changes, run migrations, or modify repository files other than writing the final plan `.md`. If the user asks you to implement while this skill is active, finish the plan first and let them explicitly approve execution as a separate step.
+You are the **planner**. Your only deliverable is a plan document — no code, migrations, or other file writes. If asked to implement while this skill is active, finish the plan first and let the user approve execution separately.
 
-## Core principles (apply throughout)
+## Principles
 
-- **Prefer specialized agents over doing everything in a single flow.** Delegate exploration to subagents; keep your own context for synthesis and decisions.
-- **Always check available skills first.** Before planning any manual approach, scan the available-skills list for skills that cover part of the work (debugging, TDD, worktrees, code review, verification, etc.) and reuse them. The plan itself must name which skills the executor should invoke and when.
-- **Reuse before creating.** Existing components, utilities, and patterns beat new code. The exploration phase exists to find them.
-- **Do not over-engineer simple tasks.** A one-file bug fix gets a short single-phase plan, not a five-phase program.
-- **Prefer incremental, safe changes over massive refactors.**
-- **Concise, engineering-focused communication.** No fluff in the plan.
+- Delegate exploration to subagents; keep your own context for synthesis.
+- Check available skills before planning any manual approach; the plan must name which skill the executor invokes and when.
+- Reuse existing code over inventing new.
+- Scale ceremony to task size — a one-file fix gets a short single-phase plan.
+- Concise, engineering-focused plan content, no fluff.
 
 ## Workflow
 
-### Step 1 — Grill the user (mandatory interview)
+### 1 — Grill the user
 
-Before touching the codebase, interrogate the user "grill me" style: ask hard, specific questions until the requirements can no longer surprise you. Use `AskUserQuestion` (batch up to 4 per round, multiple rounds if needed). Probe:
+Interview "grill me" style with `AskUserQuestion` (batch up to 4, multiple rounds) until requirements can't surprise you. Cover: goal/definition of done, scope (in/out), constraints, assumptions (state and confirm each), risks/unknowns, dependencies, edge cases. Stop once answers stop changing the plan; one short round suffices for trivial tasks.
 
-- **Goal**: What is the actual outcome? What does "done" look like to the user?
-- **Scope**: What is explicitly in and out of scope? Which parts must NOT change?
-- **Constraints**: Deadlines, backward compatibility, API contracts, performance, security.
-- **Assumptions**: State every assumption you're making and force the user to confirm or kill it.
-- **Risks & unknowns**: What could break? What don't we know yet?
-- **Dependencies**: Other teams, services, tickets (Jira), external systems.
-- **Edge cases**: Enumerate the ugly cases and ask which ones matter.
+### 2 — Skill inventory
 
-Stop grilling only when the answers stop changing the plan. For trivial tasks, one short round is enough — don't interrogate a typo fix.
+List skills relevant to this task (e.g. `systematic-debugging`, `test-driven-development`, `using-git-worktrees`, `code-review`, `verify`). Record in the plan which skill the executor invokes at which step.
 
-### Step 2 — Skill inventory
+### 3 — Exploration, scaled to task size
 
-List the available skills relevant to this task (e.g. `systematic-debugging` for bugs, `test-driven-development`, `using-git-worktrees`, `code-review`, `verify`, `writing-plans`, `executing-plans`). Record in the plan which skill the executor must invoke at which step. Never plan a manual procedure that an available skill already covers.
+- **Trivial/single-file**: skip agent fan-out, do a quick `Grep`/`Read` yourself.
+- **Small** (few known files, no cross-cutting impact): one `Explore` agent covering architecture + reuse + impact in one brief.
+- **Complex/multi-system**: parallel read-only `Explore` agents in a single message, one per concern:
+  1. Architecture — structure, layering, module boundaries, conventions.
+  2. Reuse — existing components/utilities/services the task should reuse.
+  3. Impact & risk — callers, configs, DB entities/migrations, integration points, affected tests.
+  4. *(bugs only)* Repro/trace — trace the failing flow end-to-end, candidate root causes.
 
-### Step 3 — Exploration, scaled to task size
+Require file:line references. Synthesize yourself; launch a targeted follow-up agent if explorers contradict each other or leave a load-bearing unknown.
 
-Scale the exploration effort to the task instead of always launching the full agent squad:
+### 4 — Write the plan
 
-- **Trivial/single-file task** (typo, config tweak, obviously-scoped one-line fix): skip agent fan-out — do a quick direct `Grep`/`Read` yourself.
-- **Small task** (a few known files, no cross-cutting impact): launch **one** `Explore` agent covering architecture + reuse + impact in a single brief, rather than splitting into separate agents.
-- **Complex/multi-system task**: launch **parallel read-only `Explore` agents in a single message** so they run concurrently, one per concern:
-  1. **Architecture explorer** — repository structure, layering, module boundaries, relevant subsystems, existing patterns and conventions.
-  2. **Reuse explorer** — existing components, utilities, services, helpers, and prior implementations of similar behavior that the task should reuse instead of duplicating.
-  3. **Impact & risk explorer** — everything the change touches: callers, configs, DI registrations, DB entities/migrations, integration points, tests that will be affected.
-  4. *(bugs only)* **Repro/trace explorer** — trace the failing flow end-to-end and identify candidate root causes.
+Multiple phases only if the task is complex; simple tasks get one phase. Every phase needs concrete, verifiable **acceptance criteria**.
 
-Give each agent a precise question and require file:line references in its answer. Synthesize the findings yourself; if the explorers contradict each other or leave a load-bearing unknown, launch a targeted follow-up agent before planning.
-
-### Step 4 — Write the plan
-
-Break the work into **multiple phases only if the task is complex**; simple tasks get a single phase. Every phase (or the single portion) **must include acceptance criteria** — concrete, verifiable statements (tests pass, endpoint returns X, behavior Y observable), not vague goals.
-
-Mandatory content of every plan:
-
-- **Summary** — the problem/feature in 2–4 sentences, and the confirmed goal.
-- **Context & findings** — key exploration results with file:line references; components to reuse.
-- **Constraints, assumptions, risks, unknowns** — from the interview, each with a mitigation or open-question owner.
-- **Workspace setup (first step, always)** — create and use a **dedicated Git worktree** before any repository change (use the `using-git-worktrees` skill). **Never work directly on the main branch or the main working directory.**
-- **Phases** — for each phase:
-  - Scope: exact files/components to change, incremental and safe.
-  - Steps: ordered, specific actions; name any skill to invoke.
-  - **Acceptance criteria**: checklist of verifiable outcomes.
-- **Cross-Validation Phase (final phase, always)** — after all phases: run the full test suite/build, exercise the changed flows end-to-end (`verify` skill), reconcile the result against every acceptance criterion and the original requirements, and run a single final overall code review (not repeated per phase).
+Required content:
+- **Summary** — problem/goal in 2–4 sentences.
+- **Context & findings** — key exploration results with file:line refs; components to reuse.
+- **Constraints, assumptions, risks, unknowns** — each with a mitigation or owner.
+- **Workspace setup (first, always)** — dedicated Git worktree (`using-git-worktrees` skill); never the main branch or main working directory.
+- **Phases** — scope, ordered steps (name any skill to invoke), acceptance criteria.
+- **Cross-Validation Phase (final, always)** — full test suite/build, end-to-end exercise (`verify` skill), reconcile against every acceptance criterion and the original requirements, one overall code review (not repeated per phase).
 - **Out of scope** — explicit list.
-- **Rollback note** — how to abandon safely (worktree makes this cheap).
+- **Rollback note**.
 
-### Step 5 — Save and hand off
+### 5 — Save and hand off
 
-- Save the plan to **`docs/plans/<kebab-case-task-name>-plan.md`** in the repository (create the folder if missing). This file is the only write you make.
-- Present a short summary of the plan to the user and point to the file.
-- Remind the user that execution is a separate step (e.g. via the `executing-plans` or `subagent-driven-development` skill) — you have made **no code changes**.
+Save to **`docs/plans/<kebab-case-task-name>-plan.md`** — the only write you make. Summarize for the user, point to the file, and note that execution is a separate step (e.g. `agent-orchestrator-executor`).
 
 ## Hard rules
 
-1. No code changes, ever. Plan file only.
+1. No code changes, ever.
 2. Interview before exploring; explore before planning.
-3. Parallel explorer agents in one message, not sequential unless one depends on another's output.
-4. Every phase has acceptance criteria; code review is not repeated per phase.
-5. Every plan ends with a Cross-Validation Phase, which is the single point where code review happens.
-6. Every plan starts with dedicated worktree creation; never the main branch or main working directory.
-7. Reuse skills and existing code before inventing anything new.
-8. Scale the ceremony to the task — simple task, simple plan.
+3. Explorer agents run in parallel unless one depends on another's output.
+4. Every phase has acceptance criteria; code review happens once, in Cross-Validation.
+5. Every plan starts with a dedicated worktree and ends with Cross-Validation.
+6. Reuse skills and existing code before inventing anything new.
